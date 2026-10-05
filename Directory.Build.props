@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <Authors>GodRayine</Authors>
+    <Copyright>Copyright (C) 2026 GodRayine</Copyright>
+    <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/GodRayine/SunShift</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion><UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable><ImplicitUsings>disable</ImplicitUsings><AssemblyName>SunShift</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest><ApplicationIcon>Assets/SunShift.ico</ApplicationIcon><Version>0.1.0</Version>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../SunShift.Core/SunShift.Core.csproj"/><Resource Include="Assets/SunShift.ico"/><Resource Include="../../LICENSE" Link="LICENSE"/></ItemGroup>
+</Project>

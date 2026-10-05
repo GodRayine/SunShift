@@ -1,0 +1,20 @@
+<Application x:Class="SunShift.App.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:SunShift.App"
+    ThemeMode="System" ShutdownMode="OnExplicitShutdown">
+  <Application.Resources>
+    <BooleanToVisibilityConverter x:Key="Visible"/><local:PreviewConverter x:Key="Preview"/>
+    <Style TargetType="Window">
+      <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI"/><Setter Property="FontSize" Value="14"/>
+      <Setter Property="Background" Value="{DynamicResource Page}"/><Setter Property="Foreground" Value="{DynamicResource Text}"/>
+    </Style>
+    <Style x:Key="Card" TargetType="Border">
+      <Setter Property="Background" Value="{DynamicResource Surface}"/><Setter Property="BorderBrush" Value="{DynamicResource Outline}"/>
+      <Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="12"/>
+    </Style>
+    <Style x:Key="Secondary" TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource SecondaryText}"/><Setter Property="TextWrapping" Value="Wrap"/></Style>
+    <Style x:Key="Primary" TargetType="Button">
+      <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.AccentColorBrushKey}}"/>
+      <Setter Property="Foreground" Value="{DynamicResource AccentText}"/><Setter Property="Padding" Value="16,8"/><Setter Property="BorderThickness" Value="0"/>
+    </Style>
+  </Application.Resources>
+</Application>
