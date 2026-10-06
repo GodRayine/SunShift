@@ -14,9 +14,16 @@ public sealed class SettingsStore(string folder)
         if (!File.Exists(path)) return new();
         try
         {
-            var settings = JsonSerializer.Deserialize<Settings>(File.ReadAllText(path), Options);
+            var json = File.ReadAllText(path);
+            var settings = JsonSerializer.Deserialize<Settings>(json, Options);
             if (settings is not { Version: 1, Day: not null, Night: not null } ||
                 (settings.ManualLocation && settings.ManualPoint is not { IsValid: true })) throw new JsonException("Invalid settings.");
+            if (!Enum.IsDefined(settings.Theme)) settings.Theme = ThemePreference.System;
+            settings.DayRotation = (settings.DayRotation ?? new()).Normalize();
+            settings.NightRotation = (settings.NightRotation ?? new()).Normalize();
+            using var document = JsonDocument.Parse(json);
+            settings.Collection = !document.RootElement.TryGetProperty(nameof(Settings.Collection), out _) ?
+                new() { Rotate = settings.DayRotation.Enabled || settings.NightRotation.Enabled } : (settings.Collection ?? new()).Normalize();
             return settings;
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)

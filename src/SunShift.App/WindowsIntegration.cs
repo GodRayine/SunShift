@@ -18,7 +18,13 @@ using Windows.System.UserProfile;
 
 namespace SunShift.App;
 
-internal sealed class WindowsLocation
+internal interface ILocationProvider
+{
+    Task RequestPermissionAsync();
+    Task<LocationFix> ReadAsync(CancellationToken token);
+}
+
+internal sealed class WindowsLocation : ILocationProvider
 {
     private Geolocator? locator;
     public async Task RequestPermissionAsync()
@@ -94,11 +100,24 @@ internal static class Images
         var images = Path.Combine(folder, "Images");
         Directory.CreateDirectory(images);
         var path = Path.Combine(images, Guid.NewGuid().ToString("N") + ".png");
+        WritePng(frame, path);
+        return path;
+    }
+    public static void ConvertToPng(string source, string destination)
+    {
+        if (new FileInfo(source).Length > 40 * 1024 * 1024) throw new InvalidOperationException("Максимальный размер файла — 40 МБ.");
+        using var stream = File.OpenRead(source);
+        var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
+        var frame = decoder.Frames[0];
+        if ((long)frame.PixelWidth * frame.PixelHeight > 60_000_000) throw new InvalidOperationException("Максимум — 60 мегапикселей.");
+        WritePng(frame, destination);
+    }
+    private static void WritePng(BitmapFrame frame, string path)
+    {
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(frame);
         using var output = File.Create(path);
         encoder.Save(output);
-        return path;
     }
     public static BitmapImage? Preview(string? path)
     {
@@ -111,6 +130,29 @@ internal static class Images
             return image;
         }
         catch (Exception ex) when (ex is IOException or ArgumentException or NotSupportedException) { return null; }
+    }
+}
+
+// Two prepared PNGs per screen keep disk use bounded. Folder originals are read
+// only; a changed file is reconverted even when its path stays the same.
+internal sealed class PoolImageCache(string folder)
+{
+    private readonly Dictionary<bool, (string Source, long Length, DateTime Modified, int Slot, string Path)> entries = new();
+    public string Prepare(string source, bool locked)
+    {
+        var info = new FileInfo(source);
+        if (!info.Exists) throw new FileNotFoundException("Изображение не найдено.", source);
+        var found = entries.TryGetValue(locked, out var entry);
+        if (found && entry.Source == info.FullName && entry.Length == info.Length && entry.Modified == info.LastWriteTimeUtc && File.Exists(entry.Path)) return entry.Path;
+        var slot = found ? 1 - entry.Slot : 0;
+        var cache = Path.Combine(folder, "PoolCache");
+        Directory.CreateDirectory(cache);
+        var path = Path.Combine(cache, (locked ? "lock" : "desktop") + "-" + slot + ".png");
+        var temporary = path + ".tmp";
+        try { Images.ConvertToPng(source, temporary); File.Move(temporary, path, true); }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        entries[locked] = (info.FullName, info.Length, info.LastWriteTimeUtc, slot, path);
+        return path;
     }
 }
 public sealed class PreviewConverter : IValueConverter

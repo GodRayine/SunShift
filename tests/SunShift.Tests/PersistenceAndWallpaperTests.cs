@@ -64,6 +64,34 @@ public sealed class PersistenceAndWallpaperTests
         }
         finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
     }
+    [Fact] public void LegacySettingsKeepProfilesAndDefaultToWindowsTheme()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "SunShift-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            File.WriteAllText(Path.Combine(folder, "settings.json"), "{\"Version\":1,\"Automatic\":true,\"Day\":{\"Desktop\":\"day.png\"},\"Night\":{\"LockScreen\":\"night-lock.png\"}}");
+            var settings = new SettingsStore(folder).Read();
+            Assert.True(settings.Automatic); Assert.Equal(ThemePreference.System, settings.Theme);
+            Assert.Equal("day.png", settings.Day.Desktop); Assert.Equal("night-lock.png", settings.Night.LockScreen);
+            Assert.False(settings.DayRotation.Enabled); Assert.False(settings.NightRotation.Enabled);
+        }
+        finally { Directory.Delete(folder, true); }
+    }
+    [Fact] public void ThemeRoundTripAndUnknownThemePreserveOtherSettings()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "SunShift-tests-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new SettingsStore(folder);
+            store.Write(new() { Theme = ThemePreference.Dark, Automatic = true, Day = new("day.png") });
+            Assert.Equal(ThemePreference.Dark, store.Read().Theme);
+            store.Write(new() { Theme = (ThemePreference)999, Automatic = true, Day = new("day.png") });
+            var loaded = store.Read(); Assert.Equal(ThemePreference.System, loaded.Theme);
+            Assert.True(loaded.Automatic); Assert.Equal("day.png", loaded.Day.Desktop); Assert.Null(store.Warning);
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }
     private sealed class FakeSink : IWallpaperSink
     {
         public List<ImagePair> Calls { get; } = [];

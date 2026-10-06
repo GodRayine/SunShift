@@ -6,4 +6,3 @@ TestResults/
 .idea/
 *.user
 *.suo
-/scripts/noaa-reference.js

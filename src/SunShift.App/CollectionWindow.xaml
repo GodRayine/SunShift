@@ -1,0 +1,89 @@
+<Window x:Class="SunShift.App.CollectionWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Коллекция обоев" Width="880" Height="944" MinWidth="660" MinHeight="540"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" SizeChanged="Window_SizeChanged">
+  <Window.Resources><Style TargetType="Button" BasedOn="{StaticResource AppButton}"/></Window.Resources>
+  <Border Background="{DynamicResource Page}" Padding="24">
+    <Grid>
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <StackPanel Margin="0,0,0,20">
+        <TextBlock Text="Коллекция обоев" FontSize="24" FontWeight="SemiBold"/>
+        <TextBlock Text="Дополнительная настройка источников и смены по интервалу. Рассвет и закат по-прежнему выбирают дневное или ночное изображение." Style="{StaticResource Secondary}" Margin="0,8,0,16"/>
+        <CheckBox x:Name="Rotate" Content="Менять коллекцию по интервалу" AutomationProperties.Name="Менять коллекцию по интервалу"/>
+        <Label Content="Источник обоев" Target="{Binding ElementName=Mode}" Padding="0" Margin="0,16,0,6" FontWeight="SemiBold"/>
+        <ComboBox x:Name="Mode" SelectionChanged="Mode_Changed" AutomationProperties.Name="Источник коллекции обоев"/>
+      </StackPanel>
+      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Grid>
+          <StackPanel x:Name="FoldersPanel">
+            <TextBlock Text="Папки с обоями" FontSize="20" FontWeight="SemiBold"/>
+            <TextBlock Text="Настройте каталоги для каждого профиля. Если папка не задана, используется одиночное изображение из главного окна." Style="{StaticResource Secondary}" Margin="0,8,0,20"/>
+            <Border Style="{StaticResource Card}"><StackPanel>
+              <TextBlock Text="Дневные папки" FontSize="16" FontWeight="SemiBold"/>
+              <TextBlock x:Name="DayFoldersSummary" Style="{StaticResource Secondary}" FontSize="12" Margin="0,8,0,12"/>
+              <Button Content="Выбрать папки для дня…" Tag="Day" Click="Folders_Click" HorizontalAlignment="Left"/>
+            </StackPanel></Border>
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0"><StackPanel>
+              <TextBlock Text="Ночные папки" FontSize="16" FontWeight="SemiBold"/>
+              <TextBlock x:Name="NightFoldersSummary" Style="{StaticResource Secondary}" FontSize="12" Margin="0,8,0,12"/>
+              <Button Content="Выбрать папки для ночи…" Tag="Night" Click="Folders_Click" HorizontalAlignment="Left"/>
+            </StackPanel></Border>
+          </StackPanel>
+          <StackPanel x:Name="PairsPanel" Visibility="Collapsed">
+            <TextBlock Text="Связанные пары: одна сцена днём и ночью" Style="{StaticResource Secondary}" Margin="0,0,0,16"/>
+            <Grid Margin="0,0,0,16">
+              <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="16"/><ColumnDefinition/></Grid.ColumnDefinitions>
+              <StackPanel><Label Content="Интервал" Target="{Binding ElementName=PairInterval}" Padding="0"/>
+                <ComboBox x:Name="PairInterval" IsEditable="True" IsTextSearchEnabled="False" Margin="0,6,0,0" AutomationProperties.Name="Интервал смены связанных пар"/>
+                <TextBlock Text="Своё значение — в минутах (1–1440)" Style="{StaticResource Secondary}" FontSize="12" Margin="0,6,0,0"/>
+              </StackPanel>
+              <StackPanel Grid.Column="2"><Label Content="Порядок пар" Target="{Binding ElementName=PairOrder}" Padding="0"/>
+                <ComboBox x:Name="PairOrder" Margin="0,6,0,0" AutomationProperties.Name="Порядок связанных пар"/>
+              </StackPanel>
+            </Grid>
+            <Grid>
+              <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+              <Grid.ColumnDefinitions><ColumnDefinition x:Name="ListColumn" Width="180"/><ColumnDefinition x:Name="ListGap" Width="20"/><ColumnDefinition/></Grid.ColumnDefinitions>
+              <StackPanel x:Name="PairListPanel">
+                <TextBlock Text="Пары" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <ListBox x:Name="PairList" Height="250" DisplayMemberPath="Name" AutomationProperties.Name="Связанные пары обоев"/>
+                <Button Content="Добавить пару" Click="Add_Click" Margin="0,8,0,0"/>
+                <Button Content="Удалить пару" Click="Delete_Click" Margin="0,8,0,0"/>
+              </StackPanel>
+              <StackPanel Grid.Column="2" x:Name="PairEditor" DataContext="{Binding ElementName=PairList, Path=SelectedItem}">
+                <Label Content="Название пары" Target="{Binding ElementName=PairName}" Padding="0"/>
+                <TextBox x:Name="PairName" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Padding="8" Margin="0,6,0,12" AutomationProperties.Name="Название пары обоев"/>
+                <Grid>
+                  <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="16"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Text="День" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                    <Border Background="{DynamicResource Inset}" CornerRadius="8"><Image Source="{Binding Day.Desktop, Converter={StaticResource Preview}}" Height="100" Stretch="UniformToFill" AutomationProperties.Name="Дневной фон пары"/></Border>
+                    <Button Content="Рабочий стол…" Tag="DayDesktop" Click="Image_Click" Margin="0,8,0,0" AutomationProperties.Name="Выбрать дневной фон рабочего стола пары"/>
+                    <Border Background="{DynamicResource Inset}" CornerRadius="8" Margin="0,16,0,0"><Image Source="{Binding Day.LockScreen, Converter={StaticResource Preview}}" Height="80" Stretch="UniformToFill" AutomationProperties.Name="Дневной экран блокировки пары"/></Border>
+                    <Button Content="Блокировка…" Tag="DayLock" Click="Image_Click" Margin="0,8,0,0" AutomationProperties.Name="Выбрать дневной фон блокировки пары"/>
+                    <Button Content="Оставить текущий" Tag="DayLock" Click="ClearLock_Click" Margin="0,8,0,0" FontSize="12" AutomationProperties.Name="Оставить текущий дневной фон блокировки"/>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Text="Ночь" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                    <Border Background="{DynamicResource Inset}" CornerRadius="8"><Image Source="{Binding Night.Desktop, Converter={StaticResource Preview}}" Height="100" Stretch="UniformToFill" AutomationProperties.Name="Ночной фон пары"/></Border>
+                    <Button Content="Рабочий стол…" Tag="NightDesktop" Click="Image_Click" Margin="0,8,0,0" AutomationProperties.Name="Выбрать ночной фон рабочего стола пары"/>
+                    <Border Background="{DynamicResource Inset}" CornerRadius="8" Margin="0,16,0,0"><Image Source="{Binding Night.LockScreen, Converter={StaticResource Preview}}" Height="80" Stretch="UniformToFill" AutomationProperties.Name="Ночной экран блокировки пары"/></Border>
+                    <Button Content="Блокировка…" Tag="NightLock" Click="Image_Click" Margin="0,8,0,0" AutomationProperties.Name="Выбрать ночной фон блокировки пары"/>
+                    <Button Content="Оставить текущий" Tag="NightLock" Click="ClearLock_Click" Margin="0,8,0,0" FontSize="12" AutomationProperties.Name="Оставить текущий ночной фон блокировки"/>
+                  </StackPanel>
+                </Grid>
+              </StackPanel>
+            </Grid>
+            <TextBlock Text="Выбранная в списке пара станет текущей после сохранения. Обязательны дневной и ночной фон рабочего стола; блокировка — по желанию. На закате сохраняется та же пара." Style="{StaticResource Secondary}" FontSize="12" Margin="0,16,0,0"/>
+          </StackPanel>
+        </Grid>
+      </ScrollViewer>
+      <Grid Grid.Row="2" Margin="0,16,0,0">
+        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <TextBlock x:Name="Feedback" Style="{StaticResource Secondary}" VerticalAlignment="Center" Margin="0,0,12,0" AutomationProperties.LiveSetting="Polite"/>
+        <StackPanel Grid.Column="1" Orientation="Horizontal"><Button Content="Отмена" IsCancel="True" Margin="0,0,8,0"/>
+          <Button Content="Сохранить" Style="{StaticResource Primary}" Click="Save_Click" IsDefault="True"/>
+        </StackPanel>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

@@ -16,7 +16,8 @@ internal sealed class AboutWindow : Window
         Width = 540; Height = 370; ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         var panel = new StackPanel { Margin = new Thickness(28) };
-        panel.Children.Add(new TextBlock { Text = "SunShift 0.1.0", FontSize = 26, Margin = new Thickness(0, 0, 0, 18) });
+        var version = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "0.2.0";
+        panel.Children.Add(new TextBlock { Text = "SunShift " + version, FontSize = 26, Margin = new Thickness(0, 0, 0, 18) });
         panel.Children.Add(new TextBlock { Text = "Copyright (C) 2026 GodRayine\nGNU GPL, версия 3 или любая более поздняя.", TextWrapping = TextWrapping.Wrap });
         panel.Children.Add(new TextBlock
         {
