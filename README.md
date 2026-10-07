@@ -11,7 +11,8 @@
 Локальная сборка 0.5.0: `artifacts/portable-win-x64-v0.5.0/SunShift.exe` и
 `artifacts/SunShift-v0.5.0-win-x64.zip`.
 Подготовка MSIX и карточки магазина: [store/README.md](store/README.md).
-Пакет с настоящими идентификаторами Store появится после регистрации в Partner Center.
+Идентификаторы продукта Store получены: `Gordry.SunShift`, издатель `Gordry`.
+Команда сборки пакета и оставшиеся проверки описаны в `store/README.md`.
 [Опубликованные релизы на GitHub](https://github.com/GodRayine/SunShift/releases).
 Распакуйте переносимый архив и запустите `SunShift.exe`. .NET включён, установка не требуется.
 Поддерживаются Windows 10 2004+ и Windows 11, обычный пользователь без повышения прав.

@@ -1,8 +1,8 @@
 # Подготовка SunShift к Microsoft Store
 
-Версия 0.5.0, x64. Состояние: подготовлен тестовый MSIX и материалы; публикации,
-сертификата IARC и успешного WACK пока нет. Настоящая package identity ещё не выдана:
-продукт не зарегистрирован в Partner Center.
+Версия 0.5.0, x64. Получены идентификаторы продукта из Partner Center для сборки
+пакета Store. Также подготовлены тестовый MSIX и материалы; публикации,
+сертификата IARC и успешного WACK пока нет.
 
 ## Готовые материалы
 
@@ -13,6 +13,8 @@
 - `../PRIVACY.md`: политика, доступная также внутри приложения.
 - `../artifacts/store-materials/screenshots`: шесть PNG 1920×1080.
 - `../artifacts/store-materials/icons`: иконки, включая рекомендованную 300×300.
+- `../artifacts/SunShift-v0.5.0-store-x64.msix`: пакет с identity продукта,
+  без локальной подписи; Microsoft Store подписывает его при публикации.
 - `../artifacts/SunShift-v0.5.0-development-x64.msix`: тестовая identity,
   тестовая подпись; это не пакет для загрузки в карточку Store.
 - `../artifacts/SunShift-development.cer`: открытая часть тестового сертификата,
@@ -58,19 +60,29 @@ LocalMachine/TrustedPeople, а не Trusted Root. После проверки у
 не нужен. Файлы staging не являются установленным пакетом; прямой запуск EXE из них
 не проверяет package identity.
 
-## После регистрации Partner Center
+## Пакет для продукта в Partner Center
 
-Создайте / зарезервируйте продукт SunShift и получите точные Package/Identity/Name,
-Package/Identity/Publisher и PublisherDisplayName. Затем:
+Идентификаторы, предоставленные владельцем 7 октября 2026:
+
+| Поле | Значение |
+| --- | --- |
+| Package/Identity/Name | `Gordry.SunShift` |
+| Package/Identity/Publisher | `CN=1A375509-6CC3-4D47-8835-59909F491549` |
+| Package/Properties/PublisherDisplayName | `Gordry` |
+
+Команда повторной сборки:
 
 ```powershell
-./scripts/Publish-Msix.ps1 -IdentityName 'ИЗ_PARTNER_CENTER' -Publisher 'CN=ИЗ_PARTNER_CENTER' -PublisherDisplayName 'ИЗ_PARTNER_CENTER'
+./scripts/Publish-Msix.ps1 -IdentityName 'Gordry.SunShift' -Publisher 'CN=1A375509-6CC3-4D47-8835-59909F491549' -PublisherDisplayName 'Gordry'
 ```
 
-Заполните реальные значения, сохранив точный регистр. Не используйте тестовую identity.
+Сохраняйте точный регистр идентификаторов. Перед повторной сборкой переместите
+предыдущую папку `artifacts/msix-store-v0.5.0` за пределы staging.
 Получится `SunShift-v0.5.0-store-x64.msix`. Store сам подписывает MSIX при публикации;
 покупка сертификата для этой подачи не требуется. Для локальной проверки пакета
-с настоящей identity нужен отдельный соответствующий тестовый сертификат.
+с настоящей identity нужен отдельный соответствующий тестовый сертификат:
+скрипты `Sign-DevelopmentMsix.ps1` и `Install-DevelopmentMsix.ps1` предназначены
+только для пакета `SunShift.Development`.
 
 Установите компонент Windows App Certification Kit из Windows SDK. С именем реально
 установленного пакета запустите от администратора:
