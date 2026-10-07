@@ -7,7 +7,7 @@ $projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $appProject = Join-Path $projectRoot 'src\SunShift.App\SunShift.App.csproj'
 [xml]$projectDefinition = Get-Content -LiteralPath $appProject -Raw
 $version = [string]$projectDefinition.Project.PropertyGroup.Version
-$output = if ($OutputDirectory) { [System.IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $projectRoot "artifacts\portable-$Runtime" }
+$output = if ($OutputDirectory) { [System.IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $projectRoot "artifacts\portable-$Runtime-v$version" }
 dotnet publish $appProject -c Release -r $Runtime --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -o $output
 if ($LASTEXITCODE -ne 0) { throw 'Publish failed.' }
 Copy-Item -LiteralPath (Join-Path $projectRoot 'README.md') -Destination (Join-Path $output 'README.md')

@@ -8,7 +8,7 @@
 
 ## Запуск
 
-Локальная сборка 0.5.0: `artifacts/portable-win-x64/SunShift.exe` и
+Локальная сборка 0.5.0: `artifacts/portable-win-x64-v0.5.0/SunShift.exe` и
 `artifacts/SunShift-v0.5.0-win-x64.zip`.
 Подготовка MSIX и карточки магазина: [store/README.md](store/README.md).
 Пакет с настоящими идентификаторами Store появится после регистрации в Partner Center.
@@ -205,7 +205,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Publish.ps1
 Для ARM64: `scripts/Publish.ps1 -Runtime win-arm64`.
 Код ядра — `src/SunShift.Core`, Windows-интерфейс — `src/SunShift.App`.
 `PLAN.md` содержит план и критерии новой разработки.
-Готовый результат сборки: `artifacts/portable-win-x64/SunShift.exe` и
+Готовый результат сборки: `artifacts/portable-win-x64-v0.5.0/SunShift.exe` и
 `artifacts/SunShift-v0.5.0-win-x64.zip`.
 
 ## Интерфейс
@@ -254,8 +254,8 @@ Release-сборка без ошибок и предупреждений. Про
 Изолированный предпросмотр, который не меняет обои, разрешения и автозапуск:
 
 ```powershell
-.\artifacts\portable-win-x64\SunShift.exe --preview
-.\artifacts\portable-win-x64\SunShift.exe --preview --night --dark
+.\artifacts\portable-win-x64-v0.5.0\SunShift.exe --preview
+.\artifacts\portable-win-x64-v0.5.0\SunShift.exe --preview --night --dark
 ```
 
 Снимок интерфейса: `--smoke-test --output <путь.png>`; флаги `--dark`, `--light`,
