@@ -57,6 +57,7 @@ public partial class App : Application
             var checks = integration ? new IntegrationChecks(folder, PreviewMode.Clock(e.Args)) : null;
             window = new(store, settings, folder, preview && !integration, isolated ? PreviewMode.Clock(e.Args) : null, checks, checks, checks == null ? null : () => checks.Clock);
             if (e.Args.Contains("--narrow") && isolated) { window.Width = 680; window.Height = 1000; }
+            if (e.Args.Contains("--store-screenshot") && isolated) { window.Width = 1920; window.Height = 1080; }
             if (e.Args.Contains("--large-text") && isolated) window.ContentStack.LayoutTransform = new System.Windows.Media.ScaleTransform(1.25, 1.25);
             MainWindow = window;
             if (!isolated)
@@ -65,7 +66,7 @@ public partial class App : Application
                 wait = ThreadPool.RegisterWaitForSingleObject(show!, (_, _) => Dispatcher.BeginInvoke(window.ShowMain), null, Timeout.Infinite, false);
             }
             window.Show();
-            if (!isolated && e.Args.Contains("--background")) window.Hide();
+            if (!isolated && (e.Args.Contains("--background") || SunShift.App.Startup.LaunchedAtSignIn)) window.Hide();
             if (integration) checks!.Run(window, e.Args);
             else if (e.Args.Contains("--smoke-test")) PreviewMode.Capture(window, e.Args);
         }

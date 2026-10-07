@@ -56,13 +56,53 @@ public sealed class PersistenceAndWallpaperTests
         {
             var store = new SettingsStore(folder); var point = new Coordinates(55.75, 37.61);
             store.Write(new() { Automatic = true, ManualLocation = true, ManualPoint = point, Day = new("day.png"), Night = new("night.png") });
-            var loaded = store.Read(); Assert.True(loaded.Automatic); Assert.Equal(point, loaded.ManualPoint);
+            var loaded = store.Read(); Assert.True(loaded.Automatic); Assert.True(loaded.ManualLocation); Assert.Null(loaded.ManualPoint);
             Assert.Equal("night.png", loaded.Night.Desktop); Assert.False(File.Exists(Path.Combine(folder, "settings.json.tmp")));
             File.WriteAllText(Path.Combine(folder, "settings.json"), "invalid json");
             Assert.False(store.Read().Automatic); Assert.NotNull(store.Warning);
-            Assert.Equal("invalid json", File.ReadAllText(Assert.Single(Directory.GetFiles(folder, "*.recovery-*"))));
+            Assert.DoesNotContain("invalid json", File.ReadAllText(Assert.Single(Directory.GetFiles(folder, "*.recovery-*"))));
         }
         finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }
+    [Fact] public void SessionCoordinatesNeverReachSettingsOrRestart()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "SunShift-tests-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new SettingsStore(folder);
+            var session = new Settings { ManualPoint = new(12.345678, 76.54321), LastLocation = new(new(23.45678, 87.65432), 17, DateTimeOffset.UtcNow),
+                LocationDisabled = true, Theme = ThemePreference.Dark, Day = new("chosen.png") };
+            store.Write(session);
+            var json = File.ReadAllText(Path.Combine(folder, "settings.json"));
+            Assert.DoesNotContain("ManualPoint", json); Assert.DoesNotContain("LastLocation", json);
+            Assert.DoesNotContain("Latitude", json); Assert.DoesNotContain("Longitude", json);
+            Assert.NotNull(session.ManualPoint); Assert.NotNull(session.LastLocation);
+            var restart = store.Read(); Assert.Null(restart.ManualPoint); Assert.Null(restart.LastLocation);
+            Assert.True(restart.LocationDisabled); Assert.Equal("chosen.png", restart.Day.Desktop);
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }
+    [Fact] public void UpgradeRemovesLegacyCoordinatesAndRedactsRecoveryCopies()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "SunShift-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            const string old = "{\"Version\":1,\"Automatic\":true,\"ManualLocation\":true,\"ManualPoint\":{\"Latitude\":12.345678,\"Longitude\":76.54321},\"LastLocation\":{\"Point\":{\"Latitude\":23.45678,\"Longitude\":87.65432}},\"Day\":{\"Desktop\":\"chosen.png\"}}";
+            File.WriteAllText(Path.Combine(folder, "settings.json"), old);
+            File.WriteAllText(Path.Combine(folder, "settings.json.recovery-old"), old);
+            File.WriteAllText(Path.Combine(folder, "settings.json.recovery-broken"), "{\"ManualPoint\":{\"Latitude\":12.345678");
+            File.WriteAllText(Path.Combine(folder, "settings.json.tmp"), old);
+            var settings = new SettingsStore(folder).Read();
+            Assert.True(settings.Automatic); Assert.True(settings.ManualLocation); Assert.Null(settings.ManualPoint);
+            Assert.Equal("chosen.png", settings.Day.Desktop);
+            foreach (var file in Directory.GetFiles(folder))
+            {
+                var text = File.ReadAllText(file); Assert.DoesNotContain("Latitude", text);
+                Assert.DoesNotContain("12.345678", text); Assert.DoesNotContain("LastLocation", text);
+            }
+        }
+        finally { Directory.Delete(folder, true); }
     }
     [Fact] public void LegacySettingsKeepProfilesAndDefaultToWindowsTheme()
     {

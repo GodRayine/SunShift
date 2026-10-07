@@ -10,12 +10,14 @@ namespace SunShift.App;
 public partial class LocationWindow : Window
 {
     public bool IsManual { get; private set; }
+    public bool Disabled { get; private set; }
     public Coordinates? Point { get; private set; }
     internal LocationWindow(Settings settings)
     {
         InitializeComponent();
         ManualMode.IsChecked = settings.ManualLocation;
-        WindowsMode.IsChecked = !settings.ManualLocation;
+        WindowsMode.IsChecked = !settings.ManualLocation && !settings.LocationDisabled;
+        DisabledMode.IsChecked = settings.LocationDisabled;
         var point = settings.ManualPoint ?? settings.LastLocation?.Point;
         Latitude.Text = point?.Latitude.ToString("0.######", CultureInfo.InvariantCulture) ?? "";
         Longitude.Text = point?.Longitude.ToString("0.######", CultureInfo.InvariantCulture) ?? "";
@@ -24,7 +26,8 @@ public partial class LocationWindow : Window
         NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out value) && double.IsFinite(value);
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        IsManual = ManualMode.IsChecked == true;
+        Disabled = DisabledMode.IsChecked == true;
+        IsManual = !Disabled && ManualMode.IsChecked == true;
         if (IsManual)
         {
             if (!Parse(Latitude.Text, out var lat) || !Parse(Longitude.Text, out var lon) || !(Point = new Coordinates(lat, lon)).IsValid)
@@ -32,4 +35,6 @@ public partial class LocationWindow : Window
         }
         DialogResult = true;
     }
+    private void Privacy_Click(object sender, RoutedEventArgs e) => Startup.OpenPrivacy();
+    private void Policy_Click(object sender, RoutedEventArgs e) => new PrivacyWindow { Owner = this }.Show();
 }

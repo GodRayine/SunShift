@@ -28,15 +28,17 @@ internal sealed class IntegrationChecks(string folder, DateTimeOffset clock) : I
     private readonly List<ImagePair> calls = new();
     private int requests, reads;
     private bool denyPermission;
+    private bool denyRead;
     public Task RequestPermissionAsync()
     {
         requests++;
-        if (denyPermission) throw new InvalidOperationException("Геолокация недоступна: проверка отказа разрешения.");
+        if (denyPermission) throw new UnauthorizedAccessException("Геолокация недоступна: проверка отказа разрешения.");
         return Task.CompletedTask;
     }
     public Task<LocationFix> ReadAsync(CancellationToken token)
     {
         token.ThrowIfCancellationRequested(); reads++;
+        if (denyRead) throw new UnauthorizedAccessException("Геолокация недоступна: системный доступ отозван.");
         return Task.FromResult(new LocationFix(new(40.7667, -73.9), 20, clock));
     }
     public Task<ChangeResult> ChangeAsync(ImagePair pair, CancellationToken token)
@@ -83,12 +85,27 @@ internal sealed class IntegrationChecks(string folder, DateTimeOffset clock) : I
             Verify(store.Read().Theme == ThemePreference.Dark, "theme choice persists");
             await window.SetLocationAsync(false, null);
             Verify(requests == 1 && reads == 1 && state.RegionLabel.Contains("America/New_York"), "Windows location routing");
-            Verify(store.Read().Theme == ThemePreference.Dark && store.Read().LastLocation != null, "location update preserves theme and saved position");
+            Verify(store.Read().Theme == ThemePreference.Dark && store.Read().LastLocation == null && state.Settings.LastLocation != null, "location remains in session and never persists");
+            denyRead = true;
+            window.RefreshButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            await window.LastUiAction;
+            Verify(state.Settings.LastLocation == null && state.LocalClock == "—" && !window.Automatic && calls.Count == 2,
+                "revoked Windows access never reuses the former session position");
+            denyRead = false;
             denyPermission = true;
             await window.SetLocationAsync(false, null);
             Verify(state.Status.Contains("Геолокация недоступна") && state.LocalClock == "—" && calls.Count == 2, "location denial preserves wallpapers");
             await window.SetLocationAsync(true, new(-33.8688, 151.2093));
             Verify(state.RegionLabel.Contains("Australia/Sydney") && store.Read().ManualLocation, "manual coordinate routing");
+            Verify(store.Read().ManualPoint == null && state.Settings.ManualPoint != null, "manual coordinates remain in session only");
+            var readsBeforeDisable = reads;
+            await window.SetLocationAsync(false, null, true);
+            await window.CheckNowAsync();
+            window.RefreshButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            await window.LastUiAction;
+            Verify(state.Settings.LastLocation == null && state.Settings.ManualPoint == null && !window.Automatic && state.LocalClock == "—" && reads == readsBeforeDisable,
+                "location opt out clears session and stops location access");
+            await window.SetLocationAsync(true, new(-33.8688, 151.2093));
             Verify(state.SelectedNight, "editing selection survives solar refresh");
             var dayPool = Path.Combine(folder, "DayPool"); var nightPool = Path.Combine(folder, "NightPool");
             Directory.CreateDirectory(dayPool); Directory.CreateDirectory(nightPool);

@@ -66,8 +66,10 @@ public sealed class Settings
     public CollectionSettings Collection { get; set; } = new();
     public string? ActivePairId { get; set; }
     public bool ManualLocation { get; set; }
-    public Coordinates? ManualPoint { get; set; }
-    public LocationFix? LastLocation { get; set; }
+    public bool LocationDisabled { get; set; }
+    // Location belongs to the current session only, including manually entered values.
+    [JsonIgnore] public Coordinates? ManualPoint { get; set; }
+    [JsonIgnore] public LocationFix? LastLocation { get; set; }
     public ImagePair For(SunPhase phase) => phase == SunPhase.Day ? Day : Night;
     public RotationSettings RotationFor(SunPhase phase) => phase == SunPhase.Day ? DayRotation : NightRotation;
     [JsonIgnore] public WallpaperPair? ActivePair => Collection.Pairs.FirstOrDefault(pair => pair.Id == ActivePairId) ?? Collection.Pairs.FirstOrDefault();

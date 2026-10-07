@@ -14,6 +14,7 @@ Copy-Item -LiteralPath (Join-Path $projectRoot 'README.md') -Destination (Join-P
 Copy-Item -LiteralPath (Join-Path $projectRoot 'THIRD-PARTY-NOTICES.md') -Destination (Join-Path $output 'THIRD-PARTY-NOTICES.md')
 Copy-Item -LiteralPath (Join-Path $projectRoot 'LICENSE') -Destination (Join-Path $output 'LICENSE')
 Copy-Item -LiteralPath (Join-Path $projectRoot 'COPYRIGHT') -Destination (Join-Path $output 'COPYRIGHT')
+Copy-Item -LiteralPath (Join-Path $projectRoot 'PRIVACY.md') -Destination (Join-Path $output 'PRIVACY.md')
 Copy-Item -LiteralPath (Join-Path $projectRoot 'CHANGELOG.md') -Destination (Join-Path $output 'CHANGELOG.md')
 Copy-Item -LiteralPath (Join-Path $projectRoot 'PLAN.md') -Destination (Join-Path $output 'PLAN.md')
 Copy-Item -LiteralPath (Join-Path $projectRoot 'docs') -Destination $output -Recurse -Force

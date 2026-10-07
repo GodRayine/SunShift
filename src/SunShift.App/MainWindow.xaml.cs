@@ -52,7 +52,7 @@ public partial class MainWindow : Window
         poolCache = new(folder);
         DataContext = state;
         ThemePicker.ItemsSource = new[] { "Как в Windows", "Светлая", "Тёмная" };
-        state.StartupEnabled = !preview && Startup.Enabled;
+        if (location is WindowsLocation windowsLocation) windowsLocation.AccessRevoked += OnLocationRevoked;
         if (store.Warning != null) state.Status = store.Warning;
         timer.Tick += async (_, _) => await CheckAsync(false, false);
         Loaded += (_, _) => { timer.Start(); InitialCheck = InitializeAsync(); };
@@ -65,11 +65,13 @@ public partial class MainWindow : Window
     {
         Automatic = state.Settings.Automatic, Day = state.Settings.Day, Night = state.Settings.Night,
         ManualLocation = state.Settings.ManualLocation, ManualPoint = state.Settings.ManualPoint, LastLocation = state.Settings.LastLocation,
+        LocationDisabled = state.Settings.LocationDisabled,
         Theme = state.Settings.Theme, DayRotation = state.Settings.DayRotation, NightRotation = state.Settings.NightRotation,
         Collection = state.Settings.Collection, ActivePairId = state.Settings.ActivePairId
     };
     private async Task InitializeAsync()
     {
+        if (!preview) { try { state.StartupEnabled = await Startup.IsEnabledAsync(); } catch (Exception ex) { state.Status = "Не удалось проверить автозапуск. " + ex.Message; } }
         await RefreshPoolPreviewAsync(SunPhase.Day);
         await RefreshPoolPreviewAsync(SunPhase.Night);
         await CheckAsync(false, false);
@@ -134,8 +136,19 @@ public partial class MainWindow : Window
         return selection with { Images = prepared, Warning = warnings.Count == 0 ? null : string.Join("\n", warnings) };
     }
     private void Save(Settings settings) { if (!preview) store.Write(settings); state.Settings = settings; state.NotifyAll(); }
-    private LocationFix? CurrentFix(DateTimeOffset now) => state.Settings.ManualLocation && state.Settings.ManualPoint is { IsValid: true } point
-        ? new(point, 0, now) : state.Settings.LastLocation is { } fix && fix.IsUsable(now) ? fix : null;
+    private LocationFix? CurrentFix(DateTimeOffset now) => state.Settings.LocationDisabled ? null : state.Settings.ManualLocation
+        ? state.Settings.ManualPoint is { IsValid: true } point ? new(point, 0, now) : null
+        : state.Settings.LastLocation is { } fix && fix.IsUsable(now) ? fix : null;
+
+    private void OnLocationRevoked() => Dispatcher.BeginInvoke(() =>
+    {
+        if (Exiting || state.Settings.ManualLocation || state.Settings.LocationDisabled) return;
+        operation.Cancel(); operation.Dispose(); operation = new();
+        var updated = Copy(); updated.LastLocation = null; updated.Automatic = false;
+        state.ClearSolar();
+        try { Save(updated); } catch (Exception ex) { state.Settings = updated; state.NotifyAll(); state.Status = ex.Message; }
+        state.Status = "Доступ к геолокации отключён в Windows. Позиция забыта, автоматика на паузе.";
+    });
 
     private async Task CheckAsync(bool prompt, bool forceLocation)
     {
@@ -148,7 +161,7 @@ public partial class MainWindow : Window
             var fix = CurrentFix(now);
             string? locationError = null;
             var retryInterval = fix == null ? TimeSpan.FromMinutes(1) : TimeSpan.FromMinutes(5);
-            if (!preview && !state.Settings.ManualLocation &&
+            if (!preview && !state.Settings.ManualLocation && !state.Settings.LocationDisabled &&
                 (forceLocation || (Automatic && now - lastGeoAttempt >= retryInterval)))
             {
                 lastGeoAttempt = now;
@@ -162,13 +175,20 @@ public partial class MainWindow : Window
                     var updated = Copy(); updated.LastLocation = fix; Save(updated);
                 }
                 catch (OperationCanceledException) { throw; }
+                catch (UnauthorizedAccessException ex)
+                {
+                    var updated = Copy(); updated.LastLocation = null; updated.Automatic = false; Save(updated);
+                    fix = null; locationError = ex.Message;
+                }
                 catch (Exception ex) { locationError = ex.Message; }
             }
             token.ThrowIfCancellationRequested();
             if (fix == null || !fix.IsUsable(Now))
             {
                 state.ClearSolar();
-                state.Status = locationError ?? "Определите местоположение через Windows или укажите координаты вручную.";
+                state.Status = locationError ?? (state.Settings.LocationDisabled ? "Использование геопозиции выключено. Выберите источник для расчёта рассвета и заката." :
+                    state.Settings.ManualLocation ? "Введите координаты для этого сеанса: они не сохраняются после закрытия SunShift." :
+                    "Определите местоположение через Windows или укажите координаты вручную.");
                 return;
             }
             now = Now;
@@ -224,6 +244,8 @@ public partial class MainWindow : Window
             return;
         }
         if (!state.Settings.HasSources(SunPhase.Day) && !state.Settings.HasSources(SunPhase.Night)) throw new InvalidOperationException("Сначала выберите изображение или папку с обоями.");
+        if (state.Settings.LocationDisabled) throw new InvalidOperationException("Сначала включите источник местоположения.");
+        if (state.Settings.ManualLocation && state.Settings.ManualPoint is not { IsValid: true }) throw new InvalidOperationException("Введите координаты для этого сеанса.");
         if (!state.Settings.ManualLocation)
         {
             ShowMain(); state.Busy = true;
@@ -238,6 +260,10 @@ public partial class MainWindow : Window
                 var updated = Copy(); updated.LastLocation = fix; Save(updated);
                 lastGeoAttempt = Now;
             }
+            catch (UnauthorizedAccessException)
+            {
+                var updated = Copy(); updated.LastLocation = null; updated.Automatic = false; Save(updated); state.ClearSolar(); throw;
+            }
             finally { state.Busy = checking; }
         }
         if (version != enableVersion || Exiting) return;
@@ -251,17 +277,19 @@ public partial class MainWindow : Window
     {
         var dialog = new LocationWindow(state.Settings) { Owner = this };
         if (dialog.ShowDialog() != true) return;
-        await SetLocationAsync(dialog.IsManual, dialog.Point);
+        await SetLocationAsync(dialog.IsManual, dialog.Point, dialog.Disabled);
     });
-    internal async Task SetLocationAsync(bool manual, Coordinates? point)
+    internal async Task SetLocationAsync(bool manual, Coordinates? point, bool disabled = false)
     {
-        if (manual && point is not { IsValid: true }) throw new ArgumentException("Введите допустимые координаты.");
+        if (!disabled && manual && point is not { IsValid: true }) throw new ArgumentException("Введите допустимые координаты.");
+        operation.Cancel(); operation.Dispose(); operation = new();
         var updated = Copy(); updated.ManualLocation = manual; updated.ManualPoint = point;
-        // Do not reuse the former manual region when switching back to Windows.
-        if (!manual) updated.LastLocation = null;
+        updated.LocationDisabled = disabled; updated.LastLocation = null;
+        if (disabled) { updated.Automatic = false; updated.ManualPoint = null; updated.ManualLocation = false; }
         Save(updated);
+        state.ClearSolar();
         lastGeoAttempt = DateTimeOffset.MinValue;
-        await CheckAsync(!manual, !manual);
+        await CheckAsync(!manual && !disabled, !manual && !disabled);
     }
     private async void Choose_Click(object sender, RoutedEventArgs e) => await GuardAsync(async () =>
     {
@@ -371,13 +399,12 @@ public partial class MainWindow : Window
         }
         finally { state.Busy = false; }
     });
-    private async void Startup_Click(object sender, RoutedEventArgs e) => await GuardAsync(() =>
+    private async void Startup_Click(object sender, RoutedEventArgs e) => await GuardAsync(async () =>
     {
         if (preview) throw new InvalidOperationException("Автозапуск отключён в предпросмотре.");
         var enabled = ((CheckBox)sender).IsChecked == true;
-        Startup.Set(enabled); state.StartupEnabled = enabled;
+        await Startup.SetAsync(enabled); state.StartupEnabled = await Startup.IsEnabledAsync();
         state.Status = enabled ? "Автозапуск включён. Окно будет скрыто в трее." : "Автозапуск выключен.";
-        return Task.CompletedTask;
     });
     private async void Privacy_Click(object sender, RoutedEventArgs e) => await GuardAsync(() => { Startup.OpenPrivacy(); return Task.CompletedTask; });
     internal Task GuardAsync(Func<Task> action) => LastUiAction = GuardCoreAsync(action);
@@ -387,7 +414,8 @@ public partial class MainWindow : Window
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            state.Status = ex.Message; AutoToggle.IsChecked = Automatic; state.StartupEnabled = !preview && Startup.Enabled;
+            state.Status = ex.Message; AutoToggle.IsChecked = Automatic;
+            if (!preview) { try { state.StartupEnabled = await Startup.IsEnabledAsync(); } catch { state.StartupEnabled = false; } }
             ThemePicker.SetCurrentValue(ComboBox.SelectedIndexProperty, state.ThemeIndex);
         }
     }
@@ -443,6 +471,7 @@ public partial class MainWindow : Window
     {
         if (!Exiting && !preview) { e.Cancel = true; Hide(); return; }
         timer.Stop(); operation.Cancel();
+        if (location is WindowsLocation windowsLocation) windowsLocation.AccessRevoked -= OnLocationRevoked;
         if (!preview) { SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.TimeChanged -= TimeChanged; }
     }
 }

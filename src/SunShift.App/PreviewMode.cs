@@ -3,6 +3,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -13,6 +14,27 @@ namespace SunShift.App;
 
 internal static class PreviewMode
 {
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool PrintWindow(IntPtr window, IntPtr destination, uint flags);
+    [StructLayout(LayoutKind.Sequential)] private struct NativePoint { public int X, Y; }
+    [StructLayout(LayoutKind.Sequential)] private struct NativeRect { public int Left, Top, Right, Bottom; }
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ClientToScreen(IntPtr window, ref NativePoint point);
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr window, out NativeRect rectangle);
+    private static BitmapImage CaptureNative(Window window)
+    {
+        var dpi = VisualTreeHelper.GetDpi(window);
+        using var bitmap = new System.Drawing.Bitmap((int)Math.Ceiling(window.ActualWidth * dpi.DpiScaleX), (int)Math.Ceiling(window.ActualHeight * dpi.DpiScaleY));
+        using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
+        {
+            var destination = graphics.GetHdc();
+            try { if (!PrintWindow(new System.Windows.Interop.WindowInteropHelper(window).Handle, destination, 2)) throw new InvalidOperationException("Window capture failed."); }
+            finally { graphics.ReleaseHdc(destination); }
+        }
+        using var stream = new MemoryStream(); bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png); stream.Position = 0;
+        var result = new BitmapImage(); result.BeginInit(); result.CacheOption = BitmapCacheOption.OnLoad; result.StreamSource = stream; result.EndInit(); result.Freeze(); return result;
+    }
     public static DateTimeOffset Clock(string[] args) => args.Contains("--polar-day") ? new(2026, 6, 21, 10, 0, 0, TimeSpan.Zero) :
         args.Contains("--polar-night") ? new(2026, 12, 21, 10, 0, 0, TimeSpan.Zero) :
         new(2026, 10, 5, args.Contains("--night") ? 21 : 10, 0, 0, TimeSpan.Zero);
@@ -87,13 +109,37 @@ internal static class PreviewMode
                 if (args.Contains("--large-text")) ((FrameworkElement)target.Content).LayoutTransform = new ScaleTransform(1.25, 1.25);
                 target.Show();
             }
+            await target.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             target.UpdateLayout();
             var content = (FrameworkElement)target.Content;
             var bounds = content.LayoutTransform.TransformBounds(new Rect(0, 0,
                 content.ActualWidth + content.Margin.Left + content.Margin.Right,
                 content.ActualHeight + content.Margin.Top + content.Margin.Bottom));
             var bitmap = new RenderTargetBitmap((int)Math.Ceiling(bounds.Width), (int)Math.Ceiling(bounds.Height), 96, 96, PixelFormats.Pbgra32);
-            bitmap.Render(target); Save(bitmap, Output(args, "SunShift-preview.png"));
+            bitmap.Render(target);
+            if (args.Contains("--store-screenshot") && target != main)
+            {
+                // Capture both actual windows, including the native dialog caption, in the same viewport.
+                var visual = new DrawingVisual();
+                using (var dc = visual.RenderOpen())
+                {
+                    dc.DrawRectangle(new VisualBrush(main), null, new Rect(0, 0, main.ActualWidth, main.ActualHeight));
+                    var dialog = CaptureNative(target);
+                    var left = (main.ActualWidth - target.ActualWidth) / 2;
+                    var top = (main.ActualHeight - target.ActualHeight) / 2;
+                    dc.DrawImage(dialog, new Rect(left, top,
+                        target.ActualWidth, target.ActualHeight));
+                    // WPF renders asynchronously. Use the same window's deterministic client
+                    // render over its captured native frame so a pending DWM paint is not blank.
+                    var handle = new System.Windows.Interop.WindowInteropHelper(target).Handle;
+                    var client = new NativePoint(); var dpi = VisualTreeHelper.GetDpi(target);
+                    if (!GetWindowRect(handle, out var frame) || !ClientToScreen(handle, ref client)) throw new InvalidOperationException("Client bounds unavailable.");
+                    dc.DrawImage(bitmap, new Rect(left + (client.X - frame.Left) / dpi.DpiScaleX,
+                        top + (client.Y - frame.Top) / dpi.DpiScaleY, bounds.Width, bounds.Height));
+                }
+                bitmap = new RenderTargetBitmap(1920, 1080, 96, 96, PixelFormats.Pbgra32); bitmap.Render(visual);
+            }
+            Save(bitmap, Output(args, "SunShift-preview.png"));
             if (target != main) target.Close();
             main.Exiting = true; main.Close(); Application.Current.Shutdown();
         }
@@ -103,7 +149,10 @@ internal static class PreviewMode
     {
         var supported = Windows.System.UserProfile.UserProfilePersonalizationSettings.IsSupported();
         File.WriteAllText(Output(args, "SunShift-diagnostics.json"), System.Text.Json.JsonSerializer.Serialize(new
-        { OS = Environment.OSVersion.VersionString, LockScreenApiSupported = supported, Note = "Read-only check; no wallpaper change or location request." }));
+        { OS = Environment.OSVersion.VersionString, Packaged = Startup.Packaged,
+            LocationApiAvailable = Windows.Foundation.Metadata.ApiInformation.IsTypePresent("Windows.Devices.Geolocation.Geolocator"),
+            StartupTaskApiAvailable = Windows.Foundation.Metadata.ApiInformation.IsTypePresent("Windows.ApplicationModel.StartupTask"),
+            LockScreenApiSupported = supported, Note = "Read-only check; no wallpaper change or location request. API support does not prove successful personalization." }));
     }
     internal static string Output(string[] args, string defaultName)
     {

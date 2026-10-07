@@ -13,7 +13,7 @@ internal sealed class AboutWindow : Window
     public AboutWindow()
     {
         Title = "О SunShift";
-        Width = 540; Height = 370; ResizeMode = ResizeMode.NoResize;
+        Width = 540; SizeToContent = SizeToContent.Height; ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         var panel = new StackPanel { Margin = new Thickness(28) };
         var version = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "0.2.0";
@@ -30,6 +30,9 @@ internal sealed class AboutWindow : Window
         var source = new Button { Content = "Исходный код", Padding = new Thickness(12, 8, 12, 8) };
         source.Click += (_, _) => Process.Start(new ProcessStartInfo("https://github.com/GodRayine/SunShift") { UseShellExecute = true });
         buttons.Children.Add(license); buttons.Children.Add(source); panel.Children.Add(buttons);
+        var privacy = new Button { Content = "Конфиденциальность", Padding = new Thickness(12, 8, 12, 8), Margin = new Thickness(0, 16, 0, 0), HorizontalAlignment = HorizontalAlignment.Left };
+        privacy.Click += (_, _) => new PrivacyWindow { Owner = this }.Show();
+        panel.Children.Add(privacy);
         Content = panel;
     }
 

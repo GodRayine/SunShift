@@ -15,6 +15,7 @@ using SunShift.Core;
 using Windows.Devices.Geolocation;
 using Windows.Storage;
 using Windows.System.UserProfile;
+using Windows.ApplicationModel;
 
 namespace SunShift.App;
 
@@ -27,14 +28,19 @@ internal interface ILocationProvider
 internal sealed class WindowsLocation : ILocationProvider
 {
     private Geolocator? locator;
+    internal event Action? AccessRevoked;
     public async Task RequestPermissionAsync()
     {
         if (await Geolocator.RequestAccessAsync() != GeolocationAccessStatus.Allowed)
-            throw new InvalidOperationException("Разрешите геолокацию и доступ для классических приложений в параметрах Windows или укажите координаты вручную.");
+            throw new UnauthorizedAccessException("Геолокация недоступна: разрешите доступ в параметрах Windows или укажите координаты вручную.");
     }
     public async Task<LocationFix> ReadAsync(CancellationToken token)
     {
-        locator ??= new() { DesiredAccuracy = PositionAccuracy.High };
+        if (locator == null)
+        {
+            locator = new() { DesiredAccuracy = PositionAccuracy.Default };
+            locator.StatusChanged += (_, change) => { if (change.Status == PositionStatus.Disabled) AccessRevoked?.Invoke(); };
+        }
         var position = await locator.GetGeopositionAsync(TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(25)).AsTask(token);
         var c = position.Coordinate;
         var fix = new LocationFix(new(c.Point.Position.Latitude, c.Point.Position.Longitude), c.Accuracy, c.Timestamp);
@@ -164,9 +170,30 @@ public sealed class PreviewConverter : IValueConverter
 internal static class Startup
 {
     private const string Key = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    public static bool Enabled { get { using var key = Registry.CurrentUser.OpenSubKey(Key); return key?.GetValue("SunShift") is string; } }
-    public static void Set(bool enabled)
+    private const string TaskId = "SunShiftStartup";
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetCurrentPackageFullName(ref uint length, IntPtr name);
+    public static bool Packaged { get { uint length = 0; return GetCurrentPackageFullName(ref length, IntPtr.Zero) == 122; } }
+    public static bool LaunchedAtSignIn => Packaged && AppInstance.GetActivatedEventArgs()?.Kind == Windows.ApplicationModel.Activation.ActivationKind.StartupTask;
+    public static async Task<bool> IsEnabledAsync()
     {
+        if (Packaged) return (await StartupTask.GetAsync(TaskId)).State is StartupTaskState.Enabled or StartupTaskState.EnabledByPolicy;
+        using var key = Registry.CurrentUser.OpenSubKey(Key);
+        return key?.GetValue("SunShift") is string;
+    }
+    public static async Task SetAsync(bool enabled)
+    {
+        if (Packaged)
+        {
+            var task = await StartupTask.GetAsync(TaskId);
+            if (!enabled) { task.Disable(); return; }
+            var result = await task.RequestEnableAsync();
+            if (result == StartupTaskState.DisabledByUser)
+                throw new InvalidOperationException("Автозапуск отключён в Windows. Включите SunShift в «Параметры → Приложения → Автозагрузка».");
+            if (result is not (StartupTaskState.Enabled or StartupTaskState.EnabledByPolicy))
+                throw new InvalidOperationException("Windows не разрешила автозапуск SunShift.");
+            return;
+        }
         using var key = Registry.CurrentUser.CreateSubKey(Key);
         if (!enabled) { key.DeleteValue("SunShift", false); return; }
         var path = Environment.ProcessPath ?? throw new InvalidOperationException("Не найден EXE приложения.");

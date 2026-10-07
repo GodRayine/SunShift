@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+ xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+ xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+ xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+ IgnorableNamespaces="uap desktop rescap">
+ <Identity Name="@@NAME@@" Publisher="@@PUBLISHER@@" Version="@@VERSION@@" ProcessorArchitecture="x64"/>
+ <Properties>
+  <DisplayName>SunShift</DisplayName><PublisherDisplayName>@@DISPLAY@@</PublisherDisplayName>
+  <Description>Обои в ритме солнца</Description><Logo>Assets\StoreLogo.png</Logo>
+ </Properties>
+ <Resources><Resource Language="ru-ru"/></Resources>
+ <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.28000.0"/></Dependencies>
+ <Applications>
+  <Application Id="App" Executable="App\SunShift.exe" EntryPoint="Windows.FullTrustApplication">
+   <uap:VisualElements DisplayName="SunShift" Description="Дневные и ночные обои по рассвету и закату"
+    BackgroundColor="transparent" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png"/>
+   <Extensions>
+    <desktop:Extension Category="windows.startupTask" Executable="App\SunShift.exe" EntryPoint="Windows.FullTrustApplication">
+     <desktop:StartupTask TaskId="SunShiftStartup" Enabled="false" DisplayName="SunShift"/>
+    </desktop:Extension>
+   </Extensions>
+  </Application>
+ </Applications>
+ <Capabilities><rescap:Capability Name="runFullTrust"/><DeviceCapability Name="location"/></Capabilities>
+</Package>
