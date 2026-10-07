@@ -1,8 +1,9 @@
 # Подготовка SunShift к Microsoft Store
 
 Версия 0.5.0, x64. Получены идентификаторы продукта из Partner Center для сборки
-пакета Store. Также подготовлены тестовый MSIX и материалы; публикации,
-сертификата IARC и успешного WACK пока нет.
+пакета Store. WACK 10.0.28000.2957 проверил файлы Store MSIX: итог PASS,
+13 из 13 обязательных тестов пройдены. Также подготовлены тестовый MSIX и материалы;
+публикации и сертификата IARC пока нет. Проверка установленного приложения остаётся.
 
 ## Готовые материалы
 
@@ -10,6 +11,7 @@
 - `age-rating.md`: факты для анкеты IARC с целью «для всех возрастов».
 - `certification-notes.md`: назначение разрешений и сценарии для проверки Microsoft.
 - `validation.md`: выполненные проверки и оставшиеся проверки на устройстве.
+- `wack-2026-10-07.md`: итог WACK и разбор дополнительного замечания.
 - `../PRIVACY.md`: политика, доступная также внутри приложения.
 - `../artifacts/store-materials/screenshots`: шесть PNG 1920×1080.
 - `../artifacts/store-materials/icons`: иконки, включая рекомендованную 300×300.
@@ -84,8 +86,19 @@ LocalMachine/TrustedPeople, а не Trusted Root. После проверки у
 скрипты `Sign-DevelopmentMsix.ps1` и `Install-DevelopmentMsix.ps1` предназначены
 только для пакета `SunShift.Development`.
 
-Установите компонент Windows App Certification Kit из Windows SDK. С именем реально
-установленного пакета запустите от администратора:
+Windows App Certification Kit 10.0.28000.2957 установлен на компьютере подготовки.
+На другом компьютере установите компонент **Windows App Certification Kit** из
+официального Windows SDK (идентификатор компонента установщика:
+`OptionId.WindowsSoftwareLogoToolkit`). Для проверки файлов пакета запустите
+из Windows PowerShell от администратора:
+
+```powershell
+./scripts/Run-Wack.ps1 -PackagePath ./artifacts/SunShift-v0.5.0-store-x64.msix -ReportPath ./artifacts/store-checks/wack-store.xml
+```
+
+Скрипт требует новый путь отчёта, чтобы старый результат не приняли за новую проверку.
+Этот режим проверяет файлы MSIX и не подтверждает успешную установку и поведение
+приложения. Для проверки с именем уже установленного пакета:
 
 ```powershell
 ./scripts/Run-Wack.ps1 -PackageFullName 'ИМЯ_УСТАНОВЛЕННОГО_ПАКЕТА'

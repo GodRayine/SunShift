@@ -23,7 +23,7 @@
 | Тестовая подпись MSIX | SignTool создал подпись; сертификат самоподписанный, не доверен компьютером |
 | Пробная установка | Не прошла: 0x80073CF0 / 0x800B0109, нет доверия LocalMachine к тестовому сертификату |
 | Права текущего процесса | Без повышения, администратор = false |
-| Windows App Certification Kit | Не установлен; запуск SDK для подготовки отклонён автоматической проверкой разрешений: blocked by policy |
+| Windows App Certification Kit 10.0.28000.2957 | PASS для файлов Store MSIX: 13 / 13 обязательных, 10 / 11 дополнительных; один дополнительный FAIL не меняет итог |
 | Identity продукта Store | Получена от владельца: Gordry.SunShift, издатель Gordry |
 | Store submission / IARC | Не выполнены; получение identity не означает сертификацию |
 
@@ -31,7 +31,13 @@
 обои и разрешения не изменяются. Наличие API не подтверждает успешную смену фона.
 Прямой запуск EXE из staging не считается запуском установленного MSIX.
 Временные сертификаты теста удалены из CurrentUser/My и CurrentUser/TrustedPeople;
-LocalMachine, системные обои и автозапуск не изменялись. В комплекте только открытый `.cer`.
+доверие LocalMachine к ним, системные обои и автозапуск не изменялись.
+Для WACK установлен компонент официального Windows SDK. В комплекте только открытый `.cer`.
+
+Отчёт WACK: `../artifacts/store-checks/wack-store.xml`, краткий итог:
+`wack-2026-10-07.md`. Проверен конкретный пакет с identity Gordry.SunShift.
+Режим `-appxpackagepath` выполнял файловые тесты (FileOnlyTests=True),
+а не установку и ручные сценарии геопозиции / обоев / автозапуска.
 
 ## Оставшаяся проверка на устройстве
 
@@ -47,7 +53,8 @@ LocalMachine, системные обои и автозапуск не изме�
    Проверять на профиле с тестовыми обоями, чтобы не менять личную персонализацию.
 4. Проверить Windows StartupTask: включение, запуск в трее после входа,
    запрет из «Автозагрузка», отказ программы обходить запрет, выключение.
-5. Запустить WACK и сохранить XML. Исправить ошибки, затем повторить связанные проверки.
+5. Файловые проверки WACK уже пройдены. После изменения исполняемых файлов,
+   манифеста или ресурсов пересобрать MSIX и повторить WACK с новым путём отчёта.
 6. Проверить установку обновления, удаление и отсутствие startup task после удаления.
    Проверить на минимально заявленной Windows и при масштабировании 125 / 150 / 200%.
    Минимум манифеста 10.0.19041 — граница API, пока не подтверждение испытания этой ОС.
@@ -64,5 +71,6 @@ dotnet list SunShift.slnx package --vulnerable --include-transitive
 ./src/SunShift.App/bin/Release/net10.0-windows10.0.19041.0/SunShift.exe --integration-test --output artifacts/store-checks/integration-final.json
 ./scripts/Capture-StoreScreenshots.ps1
 ./scripts/Install-DevelopmentMsix.ps1 # Windows PowerShell от администратора
+./scripts/Run-Wack.ps1 -PackagePath ./artifacts/SunShift-v0.5.0-store-x64.msix -ReportPath ./artifacts/store-checks/wack-repeat.xml # новый отчёт, от администратора
 ./scripts/Run-Wack.ps1 -PackageFullName 'ИМЯ_УСТАНОВЛЕННОГО_ПАКЕТА' # от администратора
 ```
