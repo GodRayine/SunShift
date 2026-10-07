@@ -14,6 +14,7 @@ public sealed class SettingsStore(string folder)
     {
         Warning = null;
         SanitizeRecoveryFiles();
+        if (File.Exists(path + ".tmp")) SanitizeFile(path + ".tmp");
         if (!File.Exists(path)) return new();
         try
         {
@@ -27,7 +28,6 @@ public sealed class SettingsStore(string folder)
             settings.Collection = !document.RootElement.TryGetProperty(nameof(Settings.Collection), out _) ?
                 new() { Rotate = settings.DayRotation.Enabled || settings.NightRotation.Enabled } : (settings.Collection ?? new()).Normalize();
             if (ContainsLocation(document.RootElement)) Write(settings);
-            if (File.Exists(path + ".tmp")) SanitizeFile(path + ".tmp");
             return settings;
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)

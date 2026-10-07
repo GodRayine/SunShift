@@ -104,6 +104,20 @@ public sealed class PersistenceAndWallpaperTests
         }
         finally { Directory.Delete(folder, true); }
     }
+    [Fact] public void InterruptedFirstSaveCannotLeaveAnOrphanedPositionOnDisk()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "SunShift-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var temporary = Path.Combine(folder, "settings.json.tmp");
+            File.WriteAllText(temporary, "{\"ManualPoint\":{\"Latitude\":12.345678,\"Longitude\":76.54321}}");
+            Assert.False(new SettingsStore(folder).Read().Automatic);
+            Assert.DoesNotContain("Latitude", File.ReadAllText(temporary));
+            Assert.DoesNotContain("12.345678", File.ReadAllText(temporary));
+        }
+        finally { Directory.Delete(folder, true); }
+    }
     [Fact] public void LegacySettingsKeepProfilesAndDefaultToWindowsTheme()
     {
         var folder = Path.Combine(Path.GetTempPath(), "SunShift-tests-" + Guid.NewGuid().ToString("N"));
