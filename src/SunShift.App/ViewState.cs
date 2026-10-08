@@ -22,7 +22,9 @@ internal sealed class ViewState : INotifyPropertyChanged
         "Папки для дня и ночи\n" + (RotateCollection ? "Смена по интервалам профилей" : "По одному кадру из папки; переходы по солнцу сохраняются");
     public int ThemeIndex => (int)Settings.Theme;
     private bool selectedNight, selectedByUser, solarAvailable;
-    public bool SelectedNight { get => selectedNight; set { selectedByUser = true; if (selectedNight == value) return; selectedNight = value; NotifyAll(); } }
+    // Binding initialization and RadioButton group updates are not user intent.
+    public bool SelectedNight { get => selectedNight; set { if (selectedNight == value) return; selectedNight = value; NotifyAll(); } }
+    public void SelectProfile(SunPhase phase) { selectedByUser = true; SelectedNight = phase == SunPhase.Night; }
     public string RefreshLabel => Settings.ManualLocation ? "Обновить расчёт" : "Обновить геопозицию";
     public bool SelectedDay { get => !selectedNight; set { if (value) SelectedNight = false; } }
     public string ProfileTitle => selectedNight ? "Ночной профиль" : "Дневной профиль";
@@ -85,6 +87,8 @@ internal sealed class ViewState : INotifyPropertyChanged
 
     public void SetSolar(SolarSnapshot snapshot, LocationFix fix, bool manual, DateTimeOffset now)
     {
+        // Keep an editing choice during refreshes, but follow each automatic solar transition.
+        if (Automatic && solarSnapshot?.Phase != snapshot.Phase) selectedByUser = false;
         solarSnapshot = snapshot;
         PhaseLabel = snapshot.Phase == SunPhase.Day ? "Сейчас день" : "Сейчас ночь";
         PhaseGlyph = snapshot.Phase == SunPhase.Day ? "\uE706" : "\uE708";

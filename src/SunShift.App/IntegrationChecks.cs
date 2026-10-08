@@ -70,6 +70,7 @@ internal sealed class IntegrationChecks(string folder, DateTimeOffset clock) : I
             await window.LastUiAction;
             Verify(window.Automatic && calls.Count == 1 && calls[0] == day, "automatic applies actual day profile");
             window.NightTab.SetCurrentValue(RadioButton.IsCheckedProperty, true);
+            window.NightTab.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
             Verify(state.SelectedNight && state.PhaseLabel == "Сейчас день" && calls.Count == 1, "editing night does not change actual day");
             window.ClearLock.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             await window.LastUiAction;
@@ -200,6 +201,35 @@ internal sealed class IntegrationChecks(string folder, DateTimeOffset clock) : I
             await window.SetCollectionRotationAsync(false); clock = clock.AddHours(12); await window.CheckNowAsync();
             Verify(window.Automatic && state.PhaseLabel == "Сейчас ночь" && state.Settings.ActivePairId == "two" &&
                 !state.Settings.Collection.Rotate, "stopping pair rotation preserves pair across sunset");
+            Verify(state.SelectedNight && window.NightTab.IsChecked == true && window.DayTab.IsChecked == false &&
+                state.DesktopImage == state.Settings.ActivePair!.Night.Desktop,
+                "sunset synchronizes profile tab and preview with actual wallpaper");
+            window.DayTab.SetCurrentValue(RadioButton.IsCheckedProperty, true);
+            window.DayTab.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            var editingCalls = calls.Count;
+            await window.CheckNowAsync();
+            Verify(state.SelectedDay && state.PhaseLabel == "Сейчас ночь" && calls.Count == editingCalls,
+                "editing other profile survives same-phase refresh without changing wallpaper");
+            clock = clock.AddHours(12); await window.CheckNowAsync();
+            Verify(state.SelectedDay && window.DayTab.IsChecked == true && state.PhaseLabel == "Сейчас день",
+                "sunrise synchronizes active profile");
+            clock = clock.AddHours(12); await window.CheckNowAsync();
+            Verify(state.SelectedNight && window.NightTab.IsChecked == true &&
+                state.DesktopImage == state.Settings.ActivePair!.Night.Desktop,
+                "next sunset resumes following sun after manual tab selection");
+            await window.SetAutomaticAsync(false);
+            window.DayTab.SetCurrentValue(RadioButton.IsCheckedProperty, true);
+            window.DayTab.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            clock = clock.AddHours(12); await window.CheckNowAsync();
+            clock = clock.AddHours(12); await window.CheckNowAsync();
+            Verify(state.SelectedDay && state.PhaseLabel == "Сейчас ночь", "paused editing survives solar transitions");
+            var startupWindow = new MainWindow(store, new Settings { ManualLocation = true, ManualPoint = new(40.7667, -73.9) },
+                folder, false, null, this, this, () => clock);
+            startupWindow.Show(); await startupWindow.InitialCheck;
+            var startupState = (ViewState)startupWindow.DataContext;
+            Verify(startupState.PhaseLabel == "Сейчас ночь" && startupState.SelectedNight && startupWindow.NightTab.IsChecked == true,
+                "night startup bindings do not count as manual tab selection");
+            startupWindow.Exiting = true; startupWindow.Close(); window.ShowMain();
             var caption = System.Windows.Shell.WindowChrome.GetWindowChrome(window);
             Verify(window.WindowStyle == WindowStyle.None && caption?.CaptionHeight == 70 && HitTest(window, new Point(100, 30)) == 2,
                 "unified header has native caption hit testing");

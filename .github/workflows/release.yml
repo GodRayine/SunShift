@@ -1,0 +1,96 @@
+name: Publish Windows release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Validate release version
+        run: |
+          if ($env:GITHUB_REF_NAME -notmatch '^v(\d+\.\d+\.\d+)$') { throw 'Expected a vX.Y.Z release tag.' }
+          $releaseVersion = $Matches[1]
+          [xml]$project = Get-Content src/SunShift.App/SunShift.App.csproj -Raw
+          if ([string]$project.Project.PropertyGroup.Version -ne $releaseVersion) { throw 'Tag and application version differ.' }
+          "RELEASE_VERSION=$releaseVersion" >> $env:GITHUB_ENV
+      - name: Test and publish portable build
+        run: |
+          dotnet test SunShift.slnx -c Release --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
+          & ./scripts/Publish.ps1
+          $executable = Join-Path $PWD "artifacts/portable-win-x64-v$env:RELEASE_VERSION/SunShift.exe"
+          $reportPath = Join-Path $PWD 'artifacts/release-integration.json'
+          $check = Start-Process -FilePath $executable -ArgumentList @('--integration-test', '--output', ('"' + $reportPath + '"')) -WindowStyle Hidden -PassThru
+          if (-not $check.WaitForExit(60000)) { throw 'Integration checks timed out.' }
+          if ($check.ExitCode -ne 0) {
+            if (Test-Path ($reportPath + '.error.txt')) { Get-Content ($reportPath + '.error.txt') }
+            throw 'Integration checks failed.'
+          }
+          $report = Get-Content $reportPath -Raw | ConvertFrom-Json
+          if ($report.Passed.Count -eq 0 -or $report.RealOSWrites -ne 0) { throw 'Invalid integration report.' }
+          "INTEGRATION_COUNT=$($report.Passed.Count)" >> $env:GITHUB_ENV
+      - name: Package source and checksums
+        run: |
+          $sourceArchive = "artifacts/SunShift-v$env:RELEASE_VERSION-source.zip"
+          git archive --format=zip "--prefix=SunShift-v$env:RELEASE_VERSION/" "--output=$sourceArchive" HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Source archive failed.' }
+          $archives = @("artifacts/SunShift-v$env:RELEASE_VERSION-win-x64.zip", $sourceArchive)
+          $checksums = foreach ($archive in $archives) {
+            $hash = Get-FileHash -LiteralPath $archive -Algorithm SHA256
+            "$($hash.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($archive))"
+          }
+          $checksums | Set-Content "artifacts/SunShift-v$env:RELEASE_VERSION-SHA256SUMS.txt" -Encoding utf8NoBOM
+          $changelog = Get-Content CHANGELOG.md -Raw
+          $heading = '(?m)^## ' + [regex]::Escape($env:RELEASE_VERSION) + '[^\r\n]*\r?\n'
+          $section = [regex]::Split($changelog, $heading, 2)[1]
+          if (-not $section) { throw 'Version is missing from CHANGELOG.md.' }
+          $changes = [regex]::Split($section, '(?m)^## ', 2)[0].Trim()
+          $notes = @(
+            "SunShift $env:RELEASE_VERSION — обои по рассвету и закату для Windows.", '',
+            $changes, '',
+            'Также включены изменения 0.5.0: координаты хранятся только в памяти сеанса, отключение геолокации и очистка позиции при отказе Windows, подготовка MSIX для Microsoft Store.', '',
+            "**Портативная версия:** скачайте SunShift-v$env:RELEASE_VERSION-win-x64.zip, распакуйте и запустите SunShift.exe. Windows 10 2004+ / Windows 11 x64; .NET включён.", '',
+            "**Исходники:** SunShift-v$env:RELEASE_VERSION-source.zip. Для сборки нужны Windows и .NET 10 SDK:", '',
+            '```powershell', 'dotnet build SunShift.slnx -c Release', 'dotnet test SunShift.slnx -c Release', '.\scripts\Publish.ps1', '```', '',
+            'Для обновления полностью завершите старую программу кнопкой «Выйти», замените файлы и запустите новую версию. Настройки и обои в %LOCALAPPDATA%\SunShift сохраняются.', '',
+            "Портативная сборка прошла $env:INTEGRATION_COUNT изолированных проверок основного окна; системные службы в них заменены подставными. Тесты расчёта, настроек и ротации также пройдены.", '',
+            'Лицензия: GNU GPL v3 или более поздняя. Контрольные суммы обоих архивов приложены отдельно. Публикация Microsoft Store ещё не завершена.'
+          )
+          $notes | Set-Content artifacts/release-notes.md -Encoding utf8NoBOM
+      - name: Publish complete GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $assets = @(
+            "artifacts/SunShift-v$env:RELEASE_VERSION-win-x64.zip",
+            "artifacts/SunShift-v$env:RELEASE_VERSION-source.zip",
+            "artifacts/SunShift-v$env:RELEASE_VERSION-SHA256SUMS.txt"
+          )
+          gh release create $env:GITHUB_REF_NAME @assets --repo $env:GITHUB_REPOSITORY --verify-tag --draft --title "SunShift $env:RELEASE_VERSION" --notes-file artifacts/release-notes.md
+          if ($LASTEXITCODE -ne 0) { throw 'Creating release draft failed.' }
+          $release = gh release view $env:GITHUB_REF_NAME --repo $env:GITHUB_REPOSITORY --json assets | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $release.assets.Count -ne $assets.Count) { throw 'Release attachments are incomplete.' }
+          foreach ($asset in $assets) {
+            if ([IO.Path]::GetFileName($asset) -notin $release.assets.name) { throw 'Release attachment missing.' }
+          }
+          gh release edit $env:GITHUB_REF_NAME --repo $env:GITHUB_REPOSITORY --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Publishing release failed.' }

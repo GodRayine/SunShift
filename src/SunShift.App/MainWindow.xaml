@@ -91,8 +91,8 @@
           <StackPanel>
             <Border Background="{DynamicResource Inset}" CornerRadius="10" Padding="4" HorizontalAlignment="Left" Margin="0,0,0,16">
               <StackPanel Orientation="Horizontal">
-                <RadioButton x:Name="DayTab" Content="День" GroupName="Profile" Style="{StaticResource Segment}" IsChecked="{Binding SelectedDay, Mode=TwoWay}" AutomationProperties.Name="Дневной профиль"/>
-                <RadioButton x:Name="NightTab" Content="Ночь" GroupName="Profile" Style="{StaticResource Segment}" IsChecked="{Binding SelectedNight, Mode=TwoWay}" AutomationProperties.Name="Ночной профиль"/>
+                <RadioButton x:Name="DayTab" Content="День" GroupName="Profile" Style="{StaticResource Segment}" IsChecked="{Binding SelectedDay, Mode=TwoWay}" Click="Profile_Click" AutomationProperties.Name="Дневной профиль"/>
+                <RadioButton x:Name="NightTab" Content="Ночь" GroupName="Profile" Style="{StaticResource Segment}" IsChecked="{Binding SelectedNight, Mode=TwoWay}" Click="Profile_Click" AutomationProperties.Name="Ночной профиль"/>
               </StackPanel>
             </Border>
             <TextBlock Text="{Binding ProfileTitle}" FontSize="24" FontWeight="SemiBold"/>

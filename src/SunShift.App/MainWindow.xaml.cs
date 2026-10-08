@@ -272,6 +272,7 @@ public partial class MainWindow : Window
     }
     private async void Automatic_Click(object sender, RoutedEventArgs e) => await GuardAsync(() => SetAutomaticAsync(AutoToggle.IsChecked == true));
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await GuardAsync(() => CheckAsync(true, true));
+    private void Profile_Click(object sender, RoutedEventArgs e) => state.SelectProfile(sender == NightTab ? SunPhase.Night : SunPhase.Day);
 
     private async void Location_Click(object sender, RoutedEventArgs e) => await GuardAsync(async () =>
     {
@@ -293,7 +294,7 @@ public partial class MainWindow : Window
     }
     private async void Choose_Click(object sender, RoutedEventArgs e) => await GuardAsync(async () =>
     {
-        state.SelectedNight = state.SelectedNight;
+        state.SelectProfile(state.SelectedNight ? SunPhase.Night : SunPhase.Day);
         var target = (string)((Button)sender).Tag;
         var dialog = new OpenFileDialog { Title = "Выберите фон", Filter = "Изображения|*.png;*.jpg;*.jpeg;*.bmp", CheckFileExists = true };
         if (dialog.ShowDialog(this) != true) return;
@@ -309,7 +310,7 @@ public partial class MainWindow : Window
     });
     private async void Clear_Click(object sender, RoutedEventArgs e) => await GuardAsync(async () =>
     {
-        state.SelectedNight = state.SelectedNight;
+        state.SelectProfile(state.SelectedNight ? SunPhase.Night : SunPhase.Day);
         UpdateImage((string)((Button)sender).Tag, null);
         await CheckAsync(false, false);
     });
@@ -385,7 +386,7 @@ public partial class MainWindow : Window
     }
     private async void Apply_Click(object sender, RoutedEventArgs e) => await GuardAsync(async () =>
     {
-        state.SelectedNight = state.SelectedNight;
+        state.SelectProfile(state.SelectedNight ? SunPhase.Night : SunPhase.Day);
         if (preview) { state.Status = "Смена обоев отключена в предпросмотре."; return; }
         var phase = (string)((Button)sender).Tag == "Day" ? SunPhase.Day : SunPhase.Night;
         await SetAutomaticAsync(false);
